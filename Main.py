@@ -15,9 +15,9 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
+
 from model import FCNet
 from loader_models import predata, MyopiaDataset
-
 
 #Definition of a presser - a global variable that contains arguments you can use
 parser = argparse.ArgumentParser(description='Training Config', add_help=False)
@@ -48,12 +48,10 @@ parser.add_argument('--beta', type=float, default=0.98, metavar='N',
                     help='beta for optimizer')
 parser.add_argument('--alpha', type=float, default=0.91, metavar='N',
                     help='alpha for optimizer')
-
 #In order for the weights to be fixed and not random
 random.seed(42)
 np.random.seed(42)
 torch.manual_seed(42)
-
 
 #Used for validation
 def evaluate_model(model, test_loader, device):
@@ -156,17 +154,15 @@ def main(args_config):
     max_early_stopping = 5
     training_losses = []
     testing_losses = []
+    validation_losses = []
 
     for epoch in range(args_config.epochs):
         model.train()
         train_batch = []
         pbar = tqdm(train_loader, total=len(train_loader))
 
-
         for i, (input_data, targets) in enumerate(pbar):
             input_data, targets = input_data.to(device), targets.to(device)
-            #The optimizer collects the weights of the model
-            # between batch and batch, we would like to reset them to zero so as not to drag previous weights and biases
             optimizer.zero_grad()
             prediction = model(input_data)
             loss = criterion(prediction, targets)
@@ -177,6 +173,14 @@ def main(args_config):
             pbar.set_postfix({'Epoch': epoch,
                               'Training Loss': np.mean(train_batch)
                               })
+        train_loss = np.mean(train_batch)
+
+        # Calculate validation loss for this epoch using evaluate_model
+        validation_loss, _ = evaluate_model(model, test_loader, device)
+
+        # Append the validation loss for this epoch
+        validation_losses.append(validation_loss)
+
 
 
         test_loss, test_accuracy = evaluate_model(model, test_loader, device)
@@ -187,17 +191,17 @@ def main(args_config):
             path = os.getcwd()
             saved_model_path = save_net(path, model.state_dict())
             print(f"Saved model to {saved_model_path}")
-        #Test Loss plot
-        testing_losses.append(np.mean(test_loss))
-        plt.figure(figsize=(10, 5))
-        epochs = range(1, len(testing_losses) + 1)
-        plt.plot(epochs, testing_losses, label="Testing Loss")
-        plt.xlabel("Epoch")
-        plt.ylabel("Testing Loss")
-        plt.legend()
-        plt.title("Testing Loss Over Epochs")
-        plt.grid(True)
-        plt.show()
+        # #Test Loss plot
+        # testing_losses.append(np.mean(test_loss))
+        # plt.figure(figsize=(10, 5))
+        # epochs = range(1, len(testing_losses) + 1)
+        # plt.plot(epochs, testing_losses, label="Testing Loss")
+        # plt.xlabel("Epoch")
+        # plt.ylabel("Testing Loss")
+        # plt.legend()
+        # plt.title("Testing Loss Over Epochs")
+        # plt.grid(True)
+        # plt.show()
 
         # Check for early stopping
         if test_loss > best_loss:
@@ -213,6 +217,8 @@ def main(args_config):
         #Plot of the epochs
         training_losses.append(np.mean(train_batch))
 
+
+        #plot Training
         plt.figure(figsize=(10, 5))
         plt.plot(training_losses, label="Training Loss")
         plt.xlabel("Epoch")
@@ -221,8 +227,20 @@ def main(args_config):
         plt.title("Training Loss Over Epochs")
         plt.grid(True)
         plt.show(block=False)
-        plt.pause(0.1)  
+        plt.pause(0.1)
     plt.show()
+    plt.figure(figsize=(10, 5))
+    epochs = range(1, len(validation_losses) + 1)
+
+    # Plot validation loss
+    plt.plot(epochs, validation_losses, label="Validation Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Validation Loss")
+    plt.legend()
+    plt.title("Validation Loss Over Epochs")
+    plt.grid(True)
+    plt.show()
+
 
 
     test_loss, test_accuracy = evaluate_model(model, test_loader, device)
